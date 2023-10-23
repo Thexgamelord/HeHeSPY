@@ -14,6 +14,7 @@ but better to just have it all in one place.
 # Credits
 
 Luigi Auriemma - for password decoding exe <br>
-GameProgressive - for documentation that im following (made this project actually work)
+GameProgressive - for documentation that im following (made this project actually work)<br>
+chc - error codes and more
 
 any more will be added in the future
