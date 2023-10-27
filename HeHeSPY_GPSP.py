@@ -213,15 +213,24 @@ def main():
                         email_match = re.search(email_pattern, data_str)
                         passwd_pattern = r'\\pass\\([^\\]+)'
                         passwd_match = re.search(passwd_pattern, data_str)
+                        passwdenc_pattern = r'\\passenc\\([^\\]+)'
+                        passwdenc_match = re.search(passwdenc_pattern, data_str)
                         if email_match and passwd_match:
                             user = email_match.group(1)
                             passwd = passwd_match.group(1)
                             #response = f"\\nr\\nick\\Thexgameld\\uniquenick\\Thexgameld\\ndone\\final\\"
-                            response = f"\\nr\\nick\\kai\\uniquenick\\kai\\ndone\\final\\"
+                            response = f"\\nr\\nick\\defaultNick\\uniquenick\\defaultUniNick\\ndone\\final\\"
+                            print(f"Sending: {response}")
+                            client_socket.send(response.encode("utf-8"))
+                        elif email_match and passwdenc_match:
+                            user = email_match.group(1)
+                            passwdenc = passwdenc_match.group(1)
+                            #response = f"\\nr\\nick\\Thexgameld\\uniquenick\\Thexgameld\\ndone\\final\\"
+                            response = f"\\nr\\nick\\defaultNick\\uniquenick\\defaultUniNick\\ndone\\final\\"
                             print(f"Sending: {response}")
                             client_socket.send(response.encode("utf-8"))
                         else:
-                            response = "\\error\\\\err\\ERROR CODE\\fatal\\\\errmsg\\ERROR MESSAGE\\id\\1\\final\\"
+                            response = "\\error\\\\err\\4\\fatal\\\\errmsg\\error\\id\\1\\final\\"
                             print(f"Sending: {response}")
                             client_socket.send(response.encode("utf-8"))
                     else:
@@ -246,7 +255,7 @@ def main():
 
             except Exception as ex:
                 # Handle any exceptions
-                print(f"An error occurred on line {e.__traceback__.tb_lineno}: {e}")
+                print(f"An error occurred on line {ex.__traceback__.tb_lineno}: {ex}")
                 first_conn = True
             finally:
                 # Close the client socket

@@ -1,6 +1,8 @@
+import base64
 import email
 from os import name
 from pickle import FALSE
+import profile
 import socket
 import random
 import string
@@ -16,6 +18,8 @@ import passdec
 import gsmsalg
 import traceback
 from enum import Enum
+#import sqlite3
+
 
 global usr_BANNED
 usr_BANNED = False
@@ -24,13 +28,23 @@ pass_enc = False
 global Badpass
 Badpass = False
 SESS_VAR = None  # Initialize SESS_VAR before the while loop
-default_password = "RIPSPY"
 global authtoken_req
 authtoken_req = None
 
+"""
+OG GAMESPY NOTES
+
+NICKNAMES CAN ONLY BE 20 CHARACTERS LONG
+UNIQUENICKNAMES CAN ONLY BE 15 CHARACTERS LONG
+"""
+
+
+#db = sqlite3.connect("hehespy.db")
+#cur = db.cursor()
 
 # Connect to the Redis server
 redis_client = redis.StrictRedis(host='192.168.1.70', port=6379, db=0, decode_responses=True)
+
 
 def show_error(errcode, errormsg):
     error_bld = f"\\error\\\\err\\{errcode}\\fatal\\\\errmsg\\{errormsg}\\final\\"
@@ -61,9 +75,10 @@ def create_user(data_received, banned, external):
 
     while redis_client.exists(f'Users:{user}'):
         print("ERROR USER EXISTS")
-        return 'taken'
+        return None, 'taken'
 
     unikey = generate_session_id()
+    profileid = generate_profile_id()
 
     user_data = {
         'uniquenick': user,
@@ -72,10 +87,52 @@ def create_user(data_received, banned, external):
         'password': passwd,
         'sesskey': unikey,
         'banned': banned,
-        'profileid':0,
+        'emailverified':0
+    }
+    redis_client.hmset(f'Users:{user}', user_data)
+    #redis_client.hmset(f'Users:{user}@{email}', user_data)
+    print(f'[DB] SET Users:{user}', user_data)
+    return profileid ,None
+
+def create_profile(data_received, banned, external):
+    data_str = data_received.decode('utf-8', errors='ignore')  # Decode the received bytes to a string
+    print("creating profile")
+    email_pattern = r'\\email\\([^\\]+)'
+    email_match = re.search(email_pattern, data_str)
+    if email_match:
+        email = email_match.group(1)
+    print(f"got email: {email}")
+    passwd = extract_passwd(data_received) #"YpeHhg__"
+    values = extract_values(data_received)  # Use data_received directly, which is binary
+
+    if external == True:
+        passwd = gspassenc.decode(passwd)
+
+    if values:
+        passwddd, user, dserver_chall, client_chall = values
+
+        print(f"Testing user creation username: {user} password: {passwd} ")
+    else:
+        print("Values not found in received data.")
+    
+
+    while redis_client.exists(f'Profiles:{user}'):
+        print("ERROR USER EXISTS")
+        return 'taken'
+
+    uniproid = generate_profile_id()
+
+    user_data = {
+        'profileid':uniproid,
+        'userid': user_to_id(user),
+        'nick':user,
+        'serverflag':'0',
+        'status': '0',
+        'statstring':"HeHeSPY",
         'firstname':'',
         'lastname':'',
         'icquin':'',
+        'quietflags':'',
         'homepage':'thexgamelord.uk.to',
         'zipcode':'00000',
         'countrycode':'UK',
@@ -94,10 +151,11 @@ def create_user(data_received, banned, external):
         'chc':'0',
         'i1':'',
         'o1':'',
-        'conn':'0'
+        'conn':'0',
+        'quietflags':'0',
     }
-    redis_client.hmset(f'Users:{user}', user_data)
-    redis_client.hmset(f'Users:{user}@{email}', user_data)
+    redis_client.hmset(f'Profiles:{user}', user_data)
+    #redis_client.hmset(f'Users:{user}@{email}', user_data)
     print(f'[DB] SET Users:{user}', user_data)
 
 
@@ -193,6 +251,26 @@ def generate_session_id():
 def generate_session_id():
     # Get the list of all user keys in Redis
     user_keys = redis_client.keys('Users:*')
+
+    highest_session_id = 0
+
+    # Iterate through user keys to find the highest session ID
+    for user_key in user_keys:
+        user_data = redis_client.hgetall(user_key)
+        sesskey = user_data.get('sesskey')
+        
+        if sesskey is not None:
+            sesskey = int(sesskey)
+            if sesskey > highest_session_id:
+                highest_session_id = sesskey
+
+    # Increment the highest session ID by 1
+    session_id = highest_session_id + 1
+    return session_id
+
+def generate_profile_id():
+    # Get the list of all user keys in Redis
+    user_keys = redis_client.keys('Profiles:*')
 
     highest_session_id = 0
 
@@ -340,19 +418,19 @@ def extract_values(data_received):
 
         user = extract_uniquenick(data_str)
         if user:
-            return default_password, user, None, None  # Return user information
+            return None, user, None, None  # Return user information
 
         user = extract_user(data_str)
         if user:
-            return default_password, user, None, None  # Return user information
+            return None, user, None, None  # Return user information
 
         user = extract_nick(data_str)
         if user:
-            return default_password, user, None, None  # Return user information
+            return None, user, None, None  # Return user information
 
         authtoken = extract_authtoken(data_str)
         if authtoken:
-            return default_password, authtoken, None, None  # Return authtoken information
+            return None, authtoken, None, None  # Return authtoken information
 
         return None
     except Exception as e:
@@ -360,7 +438,7 @@ def extract_values(data_received):
         return None
 
 def kick_banned_user(banned_uniquenick , client_socket):
-    banresponse = f"\\error\\\\err\\256\\fatal\\\\errmsg\\{banned_uniquenick} is banned From HeHeSPY.\\final\\"
+    banresponse = f"\\error\\\\err\\262\\fatal\\\\errmsg\\{banned_uniquenick} is banned From HeHeSPY.\\final\\"
     print(f"Sending ban response: {banresponse}")
     client_socket.send(banresponse.encode("utf-8"))
     client_socket.close()
@@ -459,7 +537,21 @@ def generate_proof(pid_user, user, data_received, client_socket):
 
     # Attempt to retrieve the user's password from Redis based on the user's uniquenick
     try:
-        user_password = redis_client.hget(f'Users:{user}', 'password')
+        global at_checkk
+        global fixed_user
+        if '@' in user:
+            at_user = user
+            at_checkk = True
+            reslt = re.sub(r'@.*', '', user)
+            print(f"found email in user, {reslt}")
+            fixed_user = reslt
+            user = reslt
+            user_password = redis_client.hget(f'Users:{reslt}', 'password')
+        else:
+            at_checkk = False
+            print("have not found email in user")
+            user_password = redis_client.hget(f'Users:{user}', 'password')
+
     except redis.RedisError as e:
         print(f'Error retrieving password from Redis: {e}')
         user_password = None
@@ -501,9 +593,12 @@ def generate_proof(pid_user, user, data_received, client_socket):
     if partnerid != 0 or partnerid > 0:
         a_response = "{}{}{}{}{}{}".format(pwd2md5, " " * 48, pid_user, client_chall, server_chall, pwd2md5)
     else:
-        a_response = "{}{}{}{}{}{}".format(pwd2md5, " " * 48, user, client_chall, server_chall, pwd2md5)
+        if at_checkk == False:
+            a_response = "{}{}{}{}{}{}".format(pwd2md5, " " * 48, user, client_chall, server_chall, pwd2md5)
+        else:
+            a_response = "{}{}{}{}{}{}".format(pwd2md5, " " * 48, at_user, client_chall, server_chall, pwd2md5)
     response = do_md5(a_response)
-    print(f"REAL     RESPONSE: {cR}")
+    print(f"Received RESPONSE: {cR}")
     print(f"Expected RESPONSE: {response}")
 
     if response.startswith(cR):
@@ -521,7 +616,10 @@ def generate_proof(pid_user, user, data_received, client_socket):
         if partnerid != 0 or partnerid > 0:
             login_response = "{}{}{}{}{}{}".format(pwdmd5, " " * 48, pid_user, server_chall, client_chall, pwdmd5)
         else:
-            login_response = "{}{}{}{}{}{}".format(pwdmd5, " " * 48, user, server_chall, client_chall, pwdmd5)
+            if at_checkk == False:
+                login_response = "{}{}{}{}{}{}".format(pwdmd5, " " * 48, user, server_chall, client_chall, pwdmd5)
+            else:
+                login_response = "{}{}{}{}{}{}".format(pwdmd5, " " * 48, at_user, server_chall, client_chall, pwdmd5)
 
         # buffer_str = pwdmd5 + ' ' * 48
         # buffer_str += user
@@ -556,7 +654,7 @@ def generate_Pproof(user, data_received):
         print("Client challenge not found in received data.")
         return None
 
-    pwdmd5 = do_md5(default_password)
+    pwdmd5 = do_md5("RIPSPY")
     print(f"USER:{user},CC:{client_chall},SC:{server_chall},pwd:{pwdmd5}")
     login_response = "{}{}{}{}{}{}".format(pwdmd5," " * 48,user,server_chall,client_chall,pwdmd5)
 
@@ -748,16 +846,30 @@ def handle_client(client_socket, client_address, first_conn):
                         
                     #generate_lc_II_response(client_socket, data_received, first_conn, proof_built, GS_LT)
                     # Retrieve user data
-                    user_data = get_user(1)
+                    user_data = get_user(user)
                     print(user_data)  # This will print the user's data as a dictionary
                     global SESS_VAR
-                    SESS_VAR = redis_client.hget(f'Users:{user}', 'sesskey')#get sesskey from user
-                    if usr_BANNED:
-                        kick_banned_user(user, client_socket)
-                    else:
-                        generate_lc_II_response(client_socket, data_received, first_conn, proof_built, GS_LT)
 
-                    print(f"{user} logged in @ {SESS_VAR}")
+                    if at_checkk:
+                        SESS_VAR = redis_client.hget(f'Users:{fixed_user}', 'sesskey')#get sesskey from user
+                        print(f"getting {SESS_VAR} from {fixed_user}")
+                    else:
+                        SESS_VAR = redis_client.hget(f'Users:{user}', 'sesskey')#get sesskey from user
+                        print(f"getting {SESS_VAR} from {user}")
+
+
+                    if at_checkk:
+                        if usr_BANNED:
+                            kick_banned_user(fixed_user, client_socket)
+                        else:
+                            generate_lc_II_response(client_socket, data_received, first_conn, proof_built, GS_LT)
+                    else:
+                        if usr_BANNED:
+                            kick_banned_user(user, client_socket)
+                        else:
+                            generate_lc_II_response(client_socket, data_received, first_conn, proof_built, GS_LT)
+
+                    print(f"{user} logged in with id {SESS_VAR}")
 
                     #response = f"\\lc\\2\\sesskey\\{SESS_VAR}\\proof\\{proof_built}\\userid\\{SESS_VAR}\\profileid\\{SESS_VAR}\\user\\{user}\\lt\\{GS_LT}\\id\\1\\final\\"
                     print(f"Sending: LC 2 response")
@@ -770,13 +882,21 @@ def handle_client(client_socket, client_address, first_conn):
                         print(f"client_sessions: {client_sessions}")
                     else:
                         print("Failed to identify session key")
-
-                    if redis_client.exists(f'Users:{user}'):
-                        print("FOUND USER AND but not UPDATING SESSKEY")
-                        #upd_user_sessid = {'sesskey': SESS_VAR,}
-                        #redis_client.hmset(f'Users:{user}', upd_user_sessid)
+                    
+                    if at_checkk:
+                        if redis_client.exists(f'Users:{fixed_user}'):
+                            print("FOUND USER AND but not UPDATING SESSKEY")
+                            #upd_user_sessid = {'sesskey': SESS_VAR,}
+                            #redis_client.hmset(f'Users:{user}', upd_user_sessid)
+                        else:
+                            print("USER NOT FOUND and NOT UPDATING SESSKEY")
                     else:
-                        print("USER NOT FOUND and NOT UPDATING SESSKEY")
+                        if redis_client.exists(f'Users:{user}'):
+                            print("FOUND USER AND but not UPDATING SESSKEY")
+                            #upd_user_sessid = {'sesskey': SESS_VAR,}
+                            #redis_client.hmset(f'Users:{user}', upd_user_sessid)
+                        else:
+                            print("USER NOT FOUND and NOT UPDATING SESSKEY")
                     
                     first_conn = False
                     #response2 = f"\\bm\\100\\f\\5\\msg\\|s|1|ss|Room Name|ls|gamename://gsp!gamename/?type=title|ip|0|p|0|qm|0\\final\\"
@@ -795,10 +915,10 @@ def handle_client(client_socket, client_address, first_conn):
                 # Respond with profile information
                 #response = r"\nur\\User Created\pid\\1\final\\"
                 mkuser = create_user(data_received, 0, False)
-                if mkuser == 'taken':
+                if mkuser[1] == 'taken':
                     response = "\\error\\\\err\\513\\fatal\\\\errmsg\\Nick is taken.\\final\\"
                 else:
-                    response = f"\\nur\\\\pid\\1\\final\\"
+                    response = f"\\nur\\\\pid\\{mkuser[0]}\\final\\"
                 print(f"Sending: {response}")
                 client_socket.send(response.encode("utf-8"))
             else:
@@ -828,10 +948,10 @@ def handle_client(client_socket, client_address, first_conn):
                 #response = "\\msg\|s|1|ss|Online|ls|UK|ip|192.168.1.120|p|29900|qm|1\\final\\"
                 #handle_status_request(client_socket, data_received)
                 print("handling a status request")
-                response = "\\bm\\100\\f\\1\\msg\\|s|1|ss|Room Name|ls|gamename://gsp!gamename/?type=title|ip|0|p|0|qm|0\\final\\"
-                print(f"Sending: {response}")
-                client_socket.send(response.encode("utf-8"))
-                handle_friends_list(client_socket, SESS_VAR)
+                #response = "\\bm\\100\\f\\1\\msg\\|s|1|ss|Room Name|ls|gamename://gsp!gamename/?type=title|ip|0|p|0|qm|0\\final\\"
+                #print(f"Sending: {response}")
+                #client_socket.send(response.encode("utf-8"))
+                #handle_friends_list(client_socket, SESS_VAR)
             else:
                 pass
 
@@ -895,9 +1015,9 @@ def handle_client(client_socket, client_address, first_conn):
 
             if data_received.startswith(b'\\authadd\\'):
                 data_str = data_received.decode('utf-8', errors='ignore')  # Decode the received bytes to a string
-                bm_reason_pattern = r'\\sig\\([^\\]+)'
-                bm_reason_match = re.search(bm_reason_pattern, data_str)
-                bm_reason = bm_reason_match.group(1)
+                bm_sig_pattern = r'\\sig\\([^\\]+)'
+                bm_sig_match = re.search(bm_sig_pattern, data_str)
+                bm_sig = bm_sig_match.group(1)
 
                 bm_sender_pattern = r'\\sesskey\\([^\\]+)'
                 bm_sender_match = re.search(bm_sender_pattern, data_str)
@@ -911,9 +1031,10 @@ def handle_client(client_socket, client_address, first_conn):
 
                 bdylist = f"\\bm\\100\\f\\{bm_receiver}\\msg\\|s|1|ss|Room Name|ls|gamename://gsp!HeHeSPY/?type=title|ip|0|p|0|qm|0\\final\\"
                 client_socket.send(bdylist.encode('utf-8'))
-                #ab_response = f"\\bm\\1\\f\\{bm_sender}\\msg\\I have authorized your request to add me to your list\\final\\"
-                ab_response = f"\\bm\\100\\f\\{bm_sender}\\msg\\|s|1|ss|Room Name|ls|gamename://gsp!gamename/?type=title|ip|0|p|0|qm|0\\final\\"
+                ab_response = f"\\bm\\4\\f\\{bm_sender}\\msg\\I have authorized your request to add me to your list|signed|{bm_sig}\\final\\"  # dont know anymore
+                #ab_response = f"\\bm\\100\\f\\{bm_sender}\\msg\\|s|1|ss|Room Name|ls|gamename://gsp!gamename/?type=title|ip|0|p|0|qm|0\\final\\"
                 send_data_to_client(bm_receiver, ab_response.encode('utf-8'))
+                send_data_to_client(bm_sender, ab_response.encode('utf-8'))
 
 
                #response = f"\\bm\\2\\f\\2\\msg\\{bm_reason}\\"
@@ -941,16 +1062,17 @@ def handle_client(client_socket, client_address, first_conn):
 
             if data_received.startswith(b"\\getprofile\\"):
                 data_str = data_received.decode('utf-8', errors='ignore')  # Decode the received bytes to a string
-                bm_sessky_pattern = r'\\profileid\\([^\\]+)'
+                bm_sessky_pattern = r'\\sesskey\\([^\\]+)'
                 bm_sessky_match = re.search(bm_sessky_pattern, data_str)
                 bm_sessky = bm_sessky_match.group(1)
 
                 bm_sk_nick = get_uniquenick_by_sesskey(bm_sessky)
+                bm_sk_email = user_to_email(bm_sk_nick)
 
                 print("client asking for profile")
                 #\sig\ cf35a2e4b94b109c77f3d6018de435aa length [32]
                 gs_sig = "d41d8cd98f00b204e9800998ecf8427e" #create_rand_sig()
-                response = f"\\pi\\\\profileid\\{bm_sessky}\\nick\\{bm_sk_nick}\\userid\\{bm_sessky}\\email\\{bm_sk_nick}\\sig\\{gs_sig}\\uniquenick\\{bm_sk_nick}\\pid\\{bm_sessky}\\firstname\\firstname\\lastname\\lastname\\homepage\\https://thexgamelord.uk.to/\\zipcode\\00000\\countrycode\\US\\st\\  \\birthday\\0\\sex\\0\\icquin\\0\\aim\\\\pic\\0\\pmask\\64\\occ\\0\\ind\\0\\inc\\0\\mar\\0\\chc\\0\\i1\\0\\o1\\0\\mp\\4\\lon\\0.000000\\lat\\0.000000\\loc\\\\conn\\1\\id\\2\\final\\"
+                response = f"\\pi\\\\profileid\\{bm_sessky}\\nick\\{bm_sk_nick}\\userid\\{bm_sessky}\\email\\{bm_sk_nick}\\sig\\{gs_sig}\\uniquenick\\{bm_sk_nick}\\pid\\{bm_sessky}\\firstname\\firstname\\lastname\\lastname\\homepage\\thexgamelord.uk.to\\zipcode\\00000\\countrycode\\US\\st\\  \\birthday\\0\\sex\\0\\icquin\\0\\aim\\\\pic\\0\\pmask\\64\\occ\\0\\ind\\0\\inc\\0\\mar\\0\\chc\\0\\i1\\0\\o1\\0\\mp\\4\\lon\\0.000000\\lat\\0.000000\\loc\\\\conn\\1\\id\\2\\final\\"
                 #response = f"\\pi\\\\profileid\\{SESS_VAR}\\nick\\{username}\\uniquenick\\{SESS_VAR}\\email\\{usr_email}\\firstname\\HeHeSPY\\lastname\\HeHeSPY\\icquin\\0\\homepage\\https://thexgamelord.uk.to/\\zipcode\\NG0000\\countrycode\\US\\lon\\0.000000\\lat\\0.000000\\loc\\\\birthday\\0\\sex\\0\\pmask\\64\\aim\\{username}\\pic\\0\\occ\\0\\ind\\0\\inc\\0\\mar\\0\\chc\\0\\i1\\0\\o1\\0\\conn\\1\\sig\\{gs_sig}\\id\\2\\final\\"
                 print(f"Sending: {response}")
                 client_socket.send(response.encode("utf-8"))
@@ -972,7 +1094,22 @@ def handle_client(client_socket, client_address, first_conn):
                 print(f"Sending: {response}")
                 client_socket.send(response.encode("utf-8"))
             else:
-                pass  
+                pass
+            if data_received.startswith(b'\\kickall\\'):
+                data_str = data_received.decode('utf-8', errors='ignore')  # Decode the received bytes to a string
+                heheSPya4th_pattern = r'\\auth\\([^\\]+)'
+                heheSPya4th_match = re.search(heheSPya4th_pattern, data_str)
+                heheSPya4th = heheSPya4th_match.group(1)
+
+                heheSPya4tha = heheSPya4th.replace("3h3H", "").replace("h3FrIP", "")
+                if heheSPya4tha == "f69fc2ba27226e3be60c03bb69747985":
+                    print("kickall received")
+                    disconnect()
+                else:
+                    print("wrong authorization")
+                
+            else:
+                pass
 
             # ... Handle other cases like status, getprofile, newuser ...
 
@@ -1012,9 +1149,10 @@ def send_keep_alive():
         time.sleep(30)  # Sends keep-alive every 30 seconds
 
 def disconnect():
+    discresponse = "\\error\\\\err\\259\\fatal\\\\errmsg\\kicked by admin!\\final\\"
+    all_client_sockets.send(discresponse.encode('utf-8'))
     all_client_sockets.close()
     print("[ADMIN] KICKING ALL CLIENTS")
-    # You can perform any other cleanup or logging here
 
 def main():
     host = "0.0.0.0"
