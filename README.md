@@ -1,6 +1,7 @@
 # HeHeSPY
 
-*edit: this was all made by one person so if it is bad then sorry 🤣*
+*edit: this was all made by one person so if it is bad then sorry 🤣* <br>
+edit again: **⚠⚠ Not all services are working yet, and im the only one working on this so you will have to use another open source gamespy server for all besides the GPCM and GPSP server, until i possibly find out how to make those servers ⚠⚠**
 <br>
 <br>
 <br>
@@ -16,6 +17,18 @@ yes even that exe is required to run in the same directory as the HeHeSPY.py fil
 
 if GPSP is going to be on a different server it will need a copy of the HeHeSPY.py file with it so it can use some things from it
 but better to just have it all in one place for compatibility and i havent tested them seperated so on one server is recommended.
+
+- working to an extent
+- [x] GPCM
+- [x] GPSP
+- [x] web signup (not uploaded yet)
+- Harder ones
+- [ ] server browser v1
+- [ ] server browser v2
+- [ ] peerchat
+- [ ] webservices
+- full functionality
+- [ ] nothing yet
 
 # Credits - check them out
 
