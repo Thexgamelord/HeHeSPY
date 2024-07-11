@@ -16,21 +16,33 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
+        shell: cmd
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Create directory for compiled executables
+        shell: cmd
         run: mkdir dist
 
       - name: Find and compile Python executables
         shell: cmd
         run: |
-         for %f in (*.py) do pyinstaller --onefile %f --distpath dist
+          for %%f in (*.py) do (
+            echo Compiling %%f
+            python -m pyinstaller --onefile "%%f" --distpath dist
+          )
 
       - name: Archive compiled executables
+        shell: cmd
+        run: |
+          :: Archive compiled executables as artifacts
+          robocopy dist $(Build.ArtifactStagingDirectory)\dist /E /NFL /NDL /NJH /NJS
+          echo ##vso[task.uploadfile]$(Build.ArtifactStagingDirectory)\dist
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: compiled-scripts
-          path: dist
+          path: $(Build.ArtifactStagingDirectory)\dist
