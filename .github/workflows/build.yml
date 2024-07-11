@@ -25,12 +25,7 @@ jobs:
         run: mkdir dist
 
       - name: Find and compile Python executables
-        run: |
-          Get-ChildItem -Filter *.py | ForEach-Object {
-            $script = $_.FullName
-            Write-Output "Compiling $script"
-            python -m pyinstaller --onefile $script --distpath dist
-          }
+        run: pyinstaller --onefile HeHeSPY.py --distpath dist
 
 
       - name: Archive compiled executables
