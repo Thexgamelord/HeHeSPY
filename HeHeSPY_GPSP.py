@@ -1,5 +1,3 @@
-from enum import verify
-from pydoc import cli
 import socket
 import random
 import string
@@ -69,6 +67,25 @@ def do_md5(data):
     return proof
 """
 
+def create_user(data):
+    gpcm_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    gpcm_socket.connect(('localhost', 29900))  # Change this to your other server's address
+
+    gpcm_socket.send(data)
+
+    response = gpcm_socket.recv(1024)
+    print(f"GPCM RESPONSE: {response}")
+    gpcm_socket.close()
+    if response == b'\\nur\\pid\\1\\final\\':
+        print("user created")
+        return "made user"
+    elif response == b'\\error\\\\err\\513\\fatal\\\\errmsg\\That Nickname is taken.\\final\\':
+        print("user is taken")
+        return "taken"
+    else:
+        print("SOMETHING IS WRONG")
+        return "error"
+
 def main():
     host = "0.0.0.0"
     port = 29901
@@ -109,9 +126,14 @@ def main():
                     if data_received.startswith(b'\\newuser\\'):
                         # Respond with profile information
                         #response = r"\nur\\User Created\pid\\1\final\\"
-                        mkuser = GPCM.create_user(gdata_received, 0, True)
+                        #mkuser = GPCM.create_user(gdata_received, 0, True)
+                        mkuser = create_user(gdata_received)
                         if mkuser == 'taken':
                             response = "\\error\\\\err\\513\\fatal\\\\errmsg\\That Nickname is taken.\\final\\"
+                        elif mkuser == 'error':
+                            response = "\\error\\\\err\\253\\fatal\\\\errmsg\\SOME RANDOM ERROR.\\final\\"
+                            client_socket.send(response.encode("utf-8"))
+                            client_socket.close()
                         else:
                             response = r"\nur\\User Created\pid\\1\final\\"
                         #GPCM.create_user(1, 'john_doe', 'password123', 'session_key_1', 0)
@@ -127,19 +149,20 @@ def main():
                         uniquenick_match = re.search(uniquenick_pattern, data_str)
                         if uniquenick_match:
                             user = uniquenick_match.group(1)
-                            user_id = GPCM.user_to_id(user)
+                            #user_id = GPCM.user_to_id(user)
                             #response = f"\\bsr\\1\\nick\\Thexgameld\\uniquenick\\\\namespaceid\\1\\firstname\\firstname\\lastname\\lastname\\email\\thegamelord@proton.me\\bsr\\...\\bsrdone\\\\more\\0\\final\\"
                             if GPCM.user_exists(user):
+                                user_id = GPCM.user_to_id(user)
                                 print(f"{user} is a valid username")
-                                response = f"\\bsr\\{user_id}\\nick\\{user}\\uniquenick\\\\namespaceid\\0\\firstname\\\\lastname\\\\email\\{user}\\bsrdone\\0\\final\\"
+                                response = f"\\bsr\\{user_id}\\nick\\{user}\\uniquenick\\{user}\\namespaceid\\0\\firstname\\\\lastname\\\\email\\{user}\\bsrdone\\0\\final\\"
                                 print(f"Sending: {response}")
                                 client_socket.send(response.encode("utf-8"))
                             else:
                                 print(f"{user} is not a existing username")
-                                #response = "\\error\\\\err\\\\fatal\\\\errmsg\\The profile requested is invalid.\\final\\"
-                                #print(f"Sending: {response}")
-                                #client_socket.send(response.encode("utf-8"))
-                                #client_socket.close()
+                                response = "\\error\\\\err\\1538\\fatal\\\\errmsg\\The profile requested is invalid.\\final\\"
+                                print(f"Sending: {response}")
+                                client_socket.send(response.encode("utf-8"))
+                                client_socket.close()
                         else:
                             print("some error")
                             response = "\\error\\\\err\\3328\\fatal\\\\errmsg\\Error with search.\\final\\"
@@ -182,7 +205,8 @@ def main():
                             print(f"Sending: {response}")
                             client_socket.send(response.encode("utf-8"))
                         else:
-                            response = "\\error\\\\err\\513\\fatal\\\\errmsg\\Nick is taken.\\final\\"
+                            #response = "\\error\\\\err\\513\\fatal\\\\errmsg\\Nick is taken.\\final\\"
+                            response = "\\cur\\0\\pid\\1\\final\\"
                             print(f"Sending: {response}")
                             client_socket.send(response.encode("utf-8"))
                         #response = r"\nur\\User Created\pid\\1\final\\"
@@ -206,6 +230,7 @@ def main():
                         client_socket.send(response.encode("utf-8"))
                     else:
                         pass
+                    """
                     if data_received.startswith(b'\\nicks\\'):
                         # Respond with nick information
                         data_str = data_received.decode('utf-8', errors='ignore')
@@ -218,15 +243,22 @@ def main():
                         if email_match and passwd_match:
                             user = email_match.group(1)
                             passwd = passwd_match.group(1)
+                            nicks = GPCM.find_users_nicks_by_email(email)
+                            user_uniquenick = nicks[0]
+                            user_nick = nicks[1]
                             #response = f"\\nr\\nick\\Thexgameld\\uniquenick\\Thexgameld\\ndone\\final\\"
-                            response = f"\\nr\\nick\\defaultNick\\uniquenick\\defaultUniNick\\ndone\\final\\"
+                            response = f"\\nr\\\\nick\\{user_nick}\\uniquenick\\{user_uniquenick}\\ndone\\final\\"
                             print(f"Sending: {response}")
                             client_socket.send(response.encode("utf-8"))
                         elif email_match and passwdenc_match:
                             user = email_match.group(1)
                             passwdenc = passwdenc_match.group(1)
+                            email = email_match.group(1)
+                            nicks = GPCM.find_users_nicks_by_email(email)
+                            user_uniquenick = nicks[0]
+                            user_nick = nicks[1]
                             #response = f"\\nr\\nick\\Thexgameld\\uniquenick\\Thexgameld\\ndone\\final\\"
-                            response = f"\\nr\\nick\\defaultNick\\uniquenick\\defaultUniNick\\ndone\\final\\"
+                            response = f"\\nr\\\\nick\\{user_nick}\\uniquenick\\{user_uniquenick}\\ndone\\final\\"
                             print(f"Sending: {response}")
                             client_socket.send(response.encode("utf-8"))
                         else:
@@ -235,6 +267,48 @@ def main():
                             client_socket.send(response.encode("utf-8"))
                     else:
                         pass
+                    """
+
+                    if data_received.startswith(b'\\nicks\\'):
+                        # Respond with nick information
+                        data_str = data_received.decode('utf-8', errors='ignore')
+                        email_pattern = r'\\email\\([^\\]+)'
+                        email_match = re.search(email_pattern, data_str)
+                        passwd_pattern = r'\\pass\\([^\\]+)'
+                        passwd_match = re.search(passwd_pattern, data_str)
+                        passwdenc_pattern = r'\\passenc\\([^\\]+)'
+                        passwdenc_match = re.search(passwdenc_pattern, data_str)
+                        if email_match and passwd_match:
+                            user = email_match.group(1)
+                            passwd = passwd_match.group(1)
+                            if "@" in user:
+                                nicks = GPCM.find_users_nicks_by_email(user, True)
+                            else:
+                                nicks = GPCM.find_users_nicks_by_email(user, False)
+                            user_uniquenick = nicks[0]
+                            user_nick = nicks[1]
+                            #response = f"\\nr\\nick\\Thexgameld\\uniquenick\\Thexgameld\\ndone\\final\\"
+                            response = f"\\nr\\\\nick\\{user_nick}\\uniquenick\\{user_uniquenick}\\ndone\\final\\"
+                            print(f"Sending: {response}")
+                            client_socket.send(response.encode("utf-8"))
+                        elif email_match and passwdenc_match:
+                            user = email_match.group(1)
+                            passwdenc = passwdenc_match.group(1)
+                            email = email_match.group(1)
+                            nicks = GPCM.find_users_nicks_by_email(email)
+                            user_uniquenick = nicks[0]
+                            user_nick = nicks[1]
+                            #response = f"\\nr\\nick\\Thexgameld\\uniquenick\\Thexgameld\\ndone\\final\\"
+                            response = f"\\nr\\\\nick\\{user_nick}\\uniquenick\\{user_uniquenick}\\ndone\\final\\"
+                            print(f"Sending: {response}")
+                            client_socket.send(response.encode("utf-8"))
+                        else:
+                            response = "\\error\\\\err\\4\\fatal\\\\errmsg\\error\\id\\1\\final\\"
+                            print(f"Sending: {response}")
+                            client_socket.send(response.encode("utf-8"))
+                    else:
+                        pass
+
                     if data_received.startswith(b"\\login\\"):
                         print("Building proof")
 
@@ -248,6 +322,13 @@ def main():
                             client_socket.send(response.encode("utf-8"))
                         else:
                             print("Values not found in received data.")
+                    if data_received.startswith(b'\\ka\\\\final\\'):
+                        # Respond with PONG to PING
+                        response = b'\\ka\\\\final\\'
+                        print(f"Sending: {response}")
+                        client_socket.send(response)
+                    else:
+                        pass
 
 
 
