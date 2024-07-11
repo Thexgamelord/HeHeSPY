@@ -22,6 +22,10 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Set PYTHONPATH
+        shell: cmd
+        run: set PYTHONPATH=%PYTHONPATH%;%cd%
+
       - name: Create directory for compiled executables
         shell: cmd
         run: mkdir dist
