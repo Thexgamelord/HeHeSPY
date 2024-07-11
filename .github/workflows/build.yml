@@ -1,4 +1,4 @@
-name: Compile and Distribute Python Scripts
+name: Compile and Distribute HeHeSPY executables
 
 on: [push, pull_request]
 
@@ -18,21 +18,21 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nuitka
+          pip install pyinstaller
 
-      - name: Create directory for compiled scripts
-        run: mkdir -p compiled_scripts
+      - name: Create directory for compiled executables
+        run: mkdir -p dist
 
-      - name: Find and compile Python scripts
+      - name: Find and compile Python executables
         run: |
           for file in $(find . -name '*.py'); do
             echo "Compiling $file"
             script_name=$(basename "${file%.*}")
-            python -m nuitka --onefile --output-dir=compiled_scripts "$file"
+            python -m pyinstaller --onefile "$file"
           done
 
-      - name: Archive compiled scripts
+      - name: Archive compiled executables
         uses: actions/upload-artifact@v2
         with:
           name: compiled-scripts
-          path: compiled_scripts
+          path: dist
