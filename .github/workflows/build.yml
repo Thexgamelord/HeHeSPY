@@ -24,13 +24,14 @@ jobs:
         run: mkdir dist
 
       - name: Find and compile Python executables
+        shell: pwsh
         run: |
-         $pythonFiles = Get-ChildItem -Path $directory -Filter *.py
-
+          $pythonFiles = Get-ChildItem -Path $directory -Filter *.py
+      
           # Iterate through each Python file and run pyinstaller
           foreach ($file in $pythonFiles) {
               # Construct the pyinstaller command for each file
-              $pyinstallerCommand = "pyinstaller --onefile  `"$($file.FullName)` --distpath dist""
+              $pyinstallerCommand = "pyinstaller --onefile `"$($file.FullName)`" --distpath dist"
           
               # Run pyinstaller command
               Write-Output "Running pyinstaller for $($file.Name)..."
@@ -40,6 +41,7 @@ jobs:
               # For example, check if pyinstaller command was successful
               # if ($?) { Write-Output "Pyinstaller successfully ran for $($file.Name)" }
           }
+
 
 
       - name: Archive compiled executables
