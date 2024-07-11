@@ -22,9 +22,10 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Set PYTHONPATH
+      - name: Verify pyinstaller installation
         shell: cmd
-        run: set PYTHONPATH=%PYTHONPATH%;%cd%
+        run: |
+          python -m pip show pyinstaller
 
       - name: Create directory for compiled executables
         shell: cmd
@@ -35,13 +36,12 @@ jobs:
         run: |
           for %%f in (*.py) do (
             echo Compiling %%f
-            python -m pyinstaller --onefile "%%f" --distpath dist
+            C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe -m pyinstaller --onefile "%%f" --distpath dist
           )
 
       - name: Archive compiled executables
         shell: cmd
         run: |
-          :: Archive compiled executables as artifacts
           robocopy dist $(Build.ArtifactStagingDirectory)\dist /E /NFL /NDL /NJH /NJS
           echo ##vso[task.uploadfile]$(Build.ArtifactStagingDirectory)\dist
 
