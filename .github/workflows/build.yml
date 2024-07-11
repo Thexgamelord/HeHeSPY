@@ -25,8 +25,8 @@ jobs:
         run: mkdir dist
 
       - name: Find and compile Python executables
-        run: pyinstaller --onefile HeHeSPY.py --distpath dist
-
+        run: |
+         for %f in (*.py) do pyinstaller --onefile %f --distpath dist
 
       - name: Archive compiled executables
         uses: actions/upload-artifact@v2
