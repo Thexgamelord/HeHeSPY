@@ -25,6 +25,7 @@ jobs:
         run: mkdir dist
 
       - name: Find and compile Python executables
+        shell: cmd
         run: |
          for %f in (*.py) do pyinstaller --onefile %f --distpath dist
 
