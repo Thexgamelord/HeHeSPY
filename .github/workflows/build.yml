@@ -1,0 +1,37 @@
+name: Compile and Distribute HeHeSPY
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11' # Specify your desired Python version
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Find and compile Python scripts
+        run: |
+          mkdir -p compiled_scripts
+          for file in $(find . -name '*.py'); do
+            echo "Compiling $file"
+            pyinstaller --onefile "$file"
+            mv "dist/$(basename "${file%.*}")" compiled_binary/
+          done
+
+      - name: Archive compiled scripts
+        uses: actions/upload-artifact@v2
+        with:
+          name: compiled-binary
+          path: compiled_binary
