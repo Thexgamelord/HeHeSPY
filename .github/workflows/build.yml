@@ -13,12 +13,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.11' # Specify your desired Python version
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
           pip install nuitka
 
       - name: Create directory for compiled scripts
@@ -29,7 +28,7 @@ jobs:
           for file in $(find . -name '*.py'); do
             echo "Compiling $file"
             script_name=$(basename "${file%.*}")
-            nuitka --onefile --output-dir=compiled_scripts "$file"
+            python -m nuitka --onefile --output-dir=compiled_scripts "$file"
           done
 
       - name: Archive compiled scripts
