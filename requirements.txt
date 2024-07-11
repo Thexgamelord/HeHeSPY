@@ -1,3 +1,7 @@
 cryptography
 redis
 requests
+flask
+flask_session
+flask_limiter
+urllib3
