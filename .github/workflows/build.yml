@@ -23,11 +23,13 @@ jobs:
 
       - name: Find and compile Python scripts
         run: |
-          mkdir -p compiled_scripts
           for file in $(find . -name '*.py'); do
             echo "Compiling $file"
             pyinstaller --onefile "$file"
-            mv "dist/$(basename "${file%.*}")" compiled_binary/
+            # Extract the script name without the directory and extension
+            script_name=$(basename "${file%.*}")
+            # Move the compiled executable to the compiled_binary directory
+            mv "dist/$script_name" "compiled_binary/$script_name"
           done
 
       - name: Archive compiled scripts
