@@ -16,37 +16,34 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        shell: cmd
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-
-      - name: Verify pyinstaller installation
-        shell: cmd
-        run: |
-          python -m pip show pyinstaller
-
       - name: Create directory for compiled executables
-        shell: cmd
         run: mkdir dist
 
       - name: Find and compile Python executables
-        shell: cmd
         run: |
-          for %%f in (*.py) do (
-            echo Compiling %%f
-            C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe -m pyinstaller --onefile "%%f" --distpath dist
-          )
+         $pythonFiles = Get-ChildItem -Path $directory -Filter *.py
+
+          # Iterate through each Python file and run pyinstaller
+          foreach ($file in $pythonFiles) {
+              # Construct the pyinstaller command for each file
+              $pyinstallerCommand = "pyinstaller --onefile  `"$($file.FullName)` --distpath dist""
+          
+              # Run pyinstaller command
+              Write-Output "Running pyinstaller for $($file.Name)..."
+              Invoke-Expression -Command $pyinstallerCommand
+          
+              # Optionally, you can add more logic or output here
+              # For example, check if pyinstaller command was successful
+              # if ($?) { Write-Output "Pyinstaller successfully ran for $($file.Name)" }
+          }
+
 
       - name: Archive compiled executables
-        shell: cmd
-        run: |
-          robocopy dist $(Build.ArtifactStagingDirectory)\dist /E /NFL /NDL /NJH /NJS
-          echo ##vso[task.uploadfile]$(Build.ArtifactStagingDirectory)\dist
-
-      - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: compiled-scripts
-          path: $(Build.ArtifactStagingDirectory)\dist
+          path: dist
