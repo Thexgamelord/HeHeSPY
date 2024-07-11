@@ -26,10 +26,12 @@ jobs:
 
       - name: Find and compile Python executables
         run: |
-          for %f in (*.py) do (
-            echo Compiling %f
-            python -m pyinstaller --onefile %f --distpath dist
-          )
+          Get-ChildItem -Filter *.py | ForEach-Object {
+            $script = $_.FullName
+            Write-Output "Compiling $script"
+            python -m pyinstaller --onefile $script --distpath dist
+          }
+
 
       - name: Archive compiled executables
         uses: actions/upload-artifact@v2
