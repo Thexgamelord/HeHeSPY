@@ -20,13 +20,14 @@ import requests
 import json
 import select
 import os
+import configparser
 #import sqlite3
 
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
-
+    
 
 def Gdecode(password):
     # Convert Gamespy Base64 to Standard Base 64
@@ -72,15 +73,18 @@ def gspydecode(password):
     return decoded_password
 
 
+config = configparser.ConfigParser()
+
+config.read('hehespy.cfg')
 
 # Load the private key
 # Load the private key from a file
-private_key_file = 'priv.key'
+private_key_file = config['SECRETS']['PrivateKeyFile']
 try:
     with open(private_key_file, 'rb') as key_file:
         private_key = serialization.load_pem_private_key(
             key_file.read(),
-            password=b"REDACTED",  # If the key is not encrypted
+            password=config['SECRETS']['PrivateKeyPassword'].encode('utf-8'),  # If the key is not encrypted
             backend=default_backend()
         )
 except FileNotFoundError:
@@ -99,8 +103,8 @@ authtoken_req = None
 """
 OG GAMESPY NOTES
 
-NICKNAMES CAN ONLY BE 20 CHARACTERS LONG
-UNIQUENICKNAMES CAN ONLY BE 15 CHARACTERS LONG
+NICKNAMES CAN ONLY BE 20 CHARACTERS LONG?
+UNIQUENICKNAMES CAN ONLY BE 15 CHARACTERS LONG?
 """
 
 
@@ -1076,14 +1080,29 @@ def handle_client(client_socket, client_address, first_conn):
         server_chall = create_rand_string(10)
         #SESS_VAR = SESS_VAR = redis_client.hget(f'Users:{user}', 'sesskey')#get sesskey from user
       ###  #jses_counter += 1
+        """
         sesdo = urllib3.request(
     "POST",
-    "http://127.0.0.1/api/sessionadded",
+    f"http://{config['SECRETS']['ApiIpAddress']}/api/sessionadded",
     headers={
-        "X-Authorization": "HEYYOUSTOPTHERE"
+        "X-Authorization": f"{config['SECRETS']['ApiAuthKey']}"
     }
 )
         print(sesdo.status)
+        """
+        try:
+            sesset = urllib3.request(
+        "POST",
+        f"http://{config['SECRETS']['ApiIpAddress']}/api/sessionset",
+        headers={
+            "X-Authorization": f"{config['SECRETS']['ApiAuthKey']}"
+        },
+        body=str(len(connected_clients)).encode("utf-8")
+        )
+            print(sesset.status)
+        except Exception:
+            pass
+
         #client_socket.settimeout(10)
         #if client_address[0] != '127.0.0.1':
         #      print("Banned IP Joined")
@@ -1694,14 +1713,28 @@ Content-Length: {len(response2)};
         #first_conn = True
         print("Client disconnected.")
       ###  jses_counter -= 1
+        """
         sesundo = urllib3.request(
     "POST",
-    "http://127.0.0.1/api/sessionremoved",
+    f"http://{config['SECRETS']['ApiIpAddress']}/api/sessionremoved",
     headers={
-        "X-Authorization": "HEYYOUSTOPTHERE"
+        "X-Authorization": f"{config['SECRETS']['ApiAuthKey']}"
     }
 )
         print(sesundo.status)
+        """
+        try:
+            sesset = urllib3.request(
+        "POST",
+        f"http://{config['SECRETS']['ApiIpAddress']}/api/sessionset",
+        headers={
+            "X-Authorization": f"{config['SECRETS']['ApiAuthKey']}"
+        },
+        body=str(len(connected_clients)).encode("utf-8")
+    )
+            print(sesset.status)
+        except Exception:
+            pass
 
 # Function to send keep-alive messages to all connected clients
 def send_keep_alive():
@@ -1734,7 +1767,7 @@ def disconnect():
         print(f"status: {sreq.status_code}")
         time.sleep(120)"""
    
-
+"""
 def monitor_inactivity():
     while True:
         # Iterate over connected clients
@@ -1743,12 +1776,25 @@ def monitor_inactivity():
             is_responded = client_info["responded"]
             #print(is_responded)
             # Check if the client has been inactive for more than x seconds
-            if time.time() - last_activity_time > random.uniform(10, 15) and is_responded == False:
+            if time.time() - last_activity_time > config['GPCM']['JoinDelay'] and is_responded == False:
                 response = f"\\lc\\1\\challenge\\{server_chall}\\id\\1\\final\\"
                 print(f"Sending GS initial chall: {response}")
                 client_socket.send(response.encode("utf-8"))   
         time.sleep(1)  # Check every second for inactivity
+"""
 
+def monitor_inactivity():
+    while True:
+        # Iterate over connected clients
+        for client_socket, client_info in connected_clientsz.items():
+            is_responded = client_info["responded"]
+            #print(is_responded)
+            # Check if the client has been inactive for more than x seconds
+            if is_responded == False:
+                response = f"\\lc\\1\\challenge\\{server_chall}\\id\\1\\final\\"
+                print(f"Sending GS initial chall: {response}")
+                client_socket.send(response.encode("utf-8"))   
+        time.sleep(1)  # Check every second for inactivity
 
 def main():
     host = "0.0.0.0"
@@ -1779,7 +1825,7 @@ def main():
             
             # Accept an incoming client connection#
             global all_client_sockets            
-            client_socket, client_address = server_socket.accept()   
+            client_socket, client_address = server_socket.accept()  
             ### IP BANNING SYSTEM
             banned_ips = ["127.1.1.0"]            
             all_client_sockets = client_socket
@@ -1796,7 +1842,7 @@ def main():
                 # Add this line to add a connected client's socket to the list
                 connected_clients.append(client_socket)
                 # Add the client socket to the dictionary of connected clients
-                connected_clientsz[client_socket] = {"address": client_address, "last_activity_time": time.time(), "responded": False}
+                connected_clientsz[client_socket] = {"address": client_address, "port": client_address[1], "last_activity_time": time.time(), "responded": False}
                 print(f"[+] new client added: {client_address[0]}")     
                 
                 # Start a new thread to handle the client
