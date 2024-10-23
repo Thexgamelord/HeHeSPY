@@ -45,7 +45,7 @@ jobs:
 
 
       - name: Archive compiled executables
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4.4.3
         with:
           name: compiled-scripts
           path: dist
